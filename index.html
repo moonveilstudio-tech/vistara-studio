@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>VISTARA — AI Travel & Property Studio</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root { --brand-a: #22d3ee; --brand-b: #6366f1; --brand-c: #f97316; }
+  body {
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    background: #05070d;
+    background-image:
+      radial-gradient(900px 500px at 10% -10%, rgba(99,102,241,.18), transparent 60%),
+      radial-gradient(800px 500px at 110% 0%, rgba(34,211,238,.10), transparent 60%);
+    background-attachment: fixed;
+    color: #e2e8f0;
+  }
+  .panel {
+    background: linear-gradient(180deg, rgba(17,24,39,.85), rgba(10,14,25,.85));
+    border: 1px solid rgba(148,163,184,.12);
+    box-shadow: 0 10px 30px -12px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.03);
+    backdrop-filter: blur(14px);
+  }
+  .field {
+    width: 100%; background: rgba(2,6,23,.6); border: 1px solid rgba(51,65,85,.9);
+    color: #e2e8f0; border-radius: .75rem; padding: .6rem .8rem; font-size: .8rem; outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .field:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,.18); }
+  .field option, .field optgroup { background: #0f172a; color: #e2e8f0; }
+  .label { font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #94a3b8; display: flex; align-items: center; gap: .5rem; margin-bottom: .5rem; }
+  .step-no { width: 1.25rem; height: 1.25rem; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: .6rem; background: rgba(99,102,241,.2); color: #a5b4fc; flex-shrink: 0; }
+  .btn-primary {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6 60%, #a855f7);
+    box-shadow: 0 8px 24px -8px rgba(99,102,241,.7);
+    transition: transform .15s, filter .15s, opacity .15s;
+  }
+  .btn-primary:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-ghost { background: rgba(30,41,59,.6); border: 1px solid rgba(71,85,105,.6); color: #cbd5e1; transition: background .15s, color .15s; }
+  .btn-ghost:hover:not(:disabled) { background: rgba(51,65,85,.8); color: #fff; }
+  .btn-ghost:disabled { opacity: .45; cursor: not-allowed; }
+  .chip { border: 1px solid rgba(71,85,105,.7); background: rgba(2,6,23,.5); color: #94a3b8; transition: all .15s; }
+  .chip:hover { color: #e2e8f0; border-color: #64748b; }
+  .chip-on { background: rgba(99,102,241,.22); border-color: #6366f1; color: #c7d2fe; box-shadow: 0 0 0 1px rgba(99,102,241,.4) inset; }
+  .scene-card { transition: transform .2s, border-color .2s, box-shadow .2s; }
+  .scene-card:hover { transform: translateY(-2px); border-color: rgba(99,102,241,.45); box-shadow: 0 18px 40px -18px rgba(99,102,241,.45); }
+  .thumb { position: relative; aspect-ratio: 9/16; border-radius: .9rem; overflow: hidden; background: #020617; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; transition: transform .4s; }
+  .thumb:hover img { transform: scale(1.03); }
+  .shimmer { background: linear-gradient(110deg, #0f172a 20%, #1e293b 40%, #0f172a 60%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  .loader { border: 3px solid rgba(255,255,255,.1); border-top-color: #818cf8; border-radius: 50%; width: 22px; height: 22px; animation: spin .9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .pulse-dot { animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(.8); } }
+  .fade-in { animation: fadeIn .35s ease-out both; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .brand {
+    background: linear-gradient(90deg, #22d3ee, #6366f1 55%, #f97316);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  ::-webkit-scrollbar { width: 6px; height: 6px; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+</style>
+</head>
+<body class="min-h-screen antialiased">
+
+<!-- ============ LOGIN ============ -->
+<div id="login-gate" class="fixed inset-0 z-[9999] flex items-center justify-center p-6">
+  <div class="panel rounded-3xl p-8 sm:p-10 w-full max-w-md text-center fade-in">
+    <div class="mx-auto mb-6 w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-400 via-indigo-500 to-orange-500 flex items-center justify-center shadow-lg shadow-indigo-900/40">
+      <i class="fa-solid fa-clapperboard text-white text-xl"></i>
+    </div>
+    <p class="text-[10px] font-bold tracking-[0.3em] text-slate-500 uppercase mb-2">Welcome</p>
+    <h1 class="text-4xl sm:text-5xl font-black brand uppercase tracking-tight mb-2">VISTARA</h1>
+    <p class="text-slate-400 text-sm mb-8">AI Travel & Property Content Studio</p>
+    <form onsubmit="handleLogin(event)" class="text-left">
+      <label class="label" for="access-code"><i class="fa-solid fa-lock text-orange-400"></i> Access Code</label>
+      <input type="password" id="access-code" placeholder="Masukkan access code" required autocomplete="current-password" class="field !py-3.5 !text-sm mb-4">
+      <button type="submit" id="login-btn" class="btn-primary w-full text-white font-bold uppercase tracking-widest text-sm py-3.5 rounded-xl">
+        Masuk Studio <i class="fa-solid fa-arrow-right ml-2"></i>
+      </button>
+      <p id="login-error" class="text-rose-400 text-xs mt-3 hidden"></p>
+    </form>
+    <p class="text-[10px] text-slate-500 mt-8 border-t border-slate-800 pt-4">Akses privat. Hubungi admin jika lupa access code.</p>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app" class="hidden">
+  <header class="sticky top-0 z-40 backdrop-blur-xl bg-[#05070d]/70 border-b border-slate-800/70">
+    <div class="max-w-[1680px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-400 via-indigo-500 to-orange-500 flex items-center justify-center">
+          <i class="fa-solid fa-clapperboard text-white text-sm"></i>
+        </div>
+        <div>
+          <div class="brand font-black uppercase tracking-tight text-lg leading-none">VISTARA</div>
+          <div class="hidden sm:block text-[10px] font-semibold text-slate-500 uppercase tracking-widest mt-1">AI Travel & Property Studio</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="hidden md:inline-flex items-center gap-2 text-[11px] text-slate-400 px-3 py-1.5 rounded-full border border-slate-800 bg-slate-900/60">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Online
+        </span>
+        <button onclick="handleLogout()" title="Logout" class="w-9 h-9 rounded-lg text-slate-400 hover:text-white hover:bg-rose-500/80 border border-slate-800 transition">
+          <i class="fa-solid fa-right-from-bracket text-sm"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-[1680px] mx-auto px-4 sm:px-6 py-6 grid grid-cols-1 lg:grid-cols-[400px_minmax(0,1fr)] gap-6 items-start">
+
+    <!-- ===== SIDEBAR: CONFIG ===== -->
+    <aside class="lg:sticky lg:top-24 space-y-4">
+      <div class="panel rounded-2xl p-5">
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <h2 class="text-sm font-bold text-white flex items-center gap-2"><i class="fa-solid fa-sliders text-indigo-400"></i> Studio Configuration</h2>
+            <p class="text-[11px] text-slate-500 mt-0.5">Atur materi, niche, dan gaya video</p>
+          </div>
+          <button onclick="resetStudio()" title="Reset" class="btn-ghost w-8 h-8 rounded-lg flex items-center justify-center hover:!text-rose-300">
+            <i class="fa-solid fa-rotate-left text-xs"></i>
+          </button>
+        </div>
+
+        <!-- Mode tabs -->
+        <div class="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-950/70 border border-slate-800 mb-6">
+          <button id="mode-travel" onclick="setMode('travel')" class="py-2 rounded-lg text-xs font-bold transition">
+            <i class="fa-solid fa-plane-departure mr-1"></i> Travel
+          </button>
+          <button id="mode-property" onclick="setMode('property')" class="py-2 rounded-lg text-xs font-bold transition">
+            <i class="fa-solid fa-house mr-1"></i> Property
+          </button>
+        </div>
+
+        <!-- 1. Materi -->
+        <div class="mb-6">
+          <div class="label"><span class="step-no">1</span> Materi / Tempat <span class="ml-auto normal-case tracking-normal font-normal text-slate-500" id="materi-count">0/5</span></div>
+          <div id="drop-materi" onclick="document.getElementById('input-materi').click()"
+               class="group rounded-xl border-2 border-dashed border-slate-700 hover:border-indigo-500 bg-slate-950/40 p-3 cursor-pointer transition">
+            <input type="file" id="input-materi" accept="image/*" multiple class="hidden" onchange="uploadMateri(this.files)">
+            <div id="materi-placeholder" class="py-6 text-center">
+              <div class="mx-auto mb-3 w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center group-hover:scale-105 transition">
+                <i class="fa-solid fa-images text-indigo-400"></i>
+              </div>
+              <p class="text-xs text-slate-300 font-medium">Klik atau drop gambar</p>
+              <p class="text-[11px] text-slate-500 mt-1">Maksimal 5 gambar</p>
+            </div>
+            <div id="materi-grid" class="hidden grid grid-cols-5 gap-2"></div>
+          </div>
+          <button id="materi-clear" onclick="clearMateri()" class="hidden text-[11px] text-rose-400 mt-2 hover:underline">Hapus semua gambar</button>
+        </div>
+
+        <!-- 2. Model -->
+        <div class="mb-6">
+          <div class="label"><span class="step-no">2</span> Foto Talent <span class="ml-auto normal-case tracking-normal font-normal text-slate-500">Opsional</span></div>
+          <div class="flex items-center gap-4">
+            <div onclick="document.getElementById('input-model').click()"
+                 class="group relative w-20 h-20 rounded-full border-2 border-dashed border-slate-700 hover:border-pink-500 bg-slate-950/40 cursor-pointer overflow-hidden flex items-center justify-center shrink-0 transition">
+              <input type="file" id="input-model" accept="image/*" class="hidden" onchange="uploadModel(this.files[0])">
+              <i id="model-placeholder" class="fa-solid fa-user text-slate-500 text-xl group-hover:text-pink-400 transition"></i>
+              <img id="model-preview" class="hidden absolute inset-0 w-full h-full object-cover">
+            </div>
+            <div class="flex-1">
+              <p class="text-xs text-slate-300">Foto wajah talent dipakai agar karakter konsisten di semua scene.</p>
+              <button id="model-clear" onclick="clearModel()" class="hidden text-[11px] text-rose-400 mt-2 hover:underline">Hapus foto model</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Lokasi -->
+        <div class="mb-6">
+          <div class="label"><span class="step-no">3</span> Data Lokasi <span class="ml-auto normal-case tracking-normal font-normal text-slate-500">Opsional</span></div>
+          <input type="text" id="location-name" placeholder="Nama tempat / proyek / cluster" class="field mb-2">
+          <textarea id="location-info" rows="3" placeholder="Harga, fasilitas, alamat, spesifikasi..." class="field resize-none"></textarea>
+          <p class="text-[11px] text-slate-500 mt-1.5">Kosongkan jika ingin AI menebak lokasi dari gambar.</p>
+        </div>
+
+        <!-- 4. Niche -->
+        <div class="mb-6">
+          <div class="label"><span class="step-no">4</span> Niche Konten</div>
+          <select id="config-niche" onchange="handleNicheChange()" class="field cursor-pointer">
+            <optgroup label="Travel & Hospitality">
+              <option value="hotel">Review Hotel / Resort</option>
+              <option value="wisata">Review Tempat Wisata</option>
+              <option value="resto">Review Restoran / Cafe</option>
+              <option value="destinasi">Review Destinasi</option>
+              <option value="hiburan">Review Tempat Hiburan</option>
+            </optgroup>
+            <optgroup label="Property & Real Estate">
+              <option value="showunit">Show Unit Rumah / Cluster</option>
+              <option value="apartment">Apartment / Kondominium</option>
+              <option value="perumahan">Perumahan / Kavling Baru</option>
+              <option value="ruko">Ruko / Commercial Space</option>
+            </optgroup>
+          </select>
+        </div>
+
+        <!-- 5. Gaya -->
+        <div class="mb-6">
+          <div class="label"><span class="step-no">5</span> Gaya Konten</div>
+          <select id="config-style" class="field cursor-pointer"></select>
+        </div>
+
+        <!-- 6. Durasi -->
+        <div class="mb-6">
+          <div class="label"><span class="step-no">6</span> Durasi Video</div>
+          <div class="grid grid-cols-3 gap-2">
+            <button id="dur-10" onclick="setDuration(10)" class="chip py-2.5 rounded-xl text-xs font-bold">10 detik</button>
+            <button id="dur-20" onclick="setDuration(20)" class="chip py-2.5 rounded-xl text-xs font-bold">20 detik</button>
+            <button id="dur-30" onclick="setDuration(30)" class="chip py-2.5 rounded-xl text-xs font-bold">30 detik</button>
+          </div>
+        </div>
+
+        <div id="error-box" class="hidden mb-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300 fade-in"></div>
+
+        <button id="btn-generate" onclick="startGeneration()" class="btn-primary w-full text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+          <span id="btn-text">Generate Storyboard</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ===== CONTENT ===== -->
+    <section class="min-w-0 space-y-6">
+
+      <!-- Empty -->
+      <div id="empty-state" class="panel rounded-2xl min-h-[560px] flex flex-col items-center justify-center text-center p-10 fade-in">
+        <div class="relative mb-6">
+          <div class="absolute inset-0 blur-2xl bg-indigo-500/30 rounded-full"></div>
+          <div class="relative w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-cyan-500/10 border border-indigo-500/30 flex items-center justify-center">
+            <i class="fa-solid fa-clapperboard text-3xl text-indigo-300"></i>
+          </div>
+        </div>
+        <h3 class="text-xl font-bold text-white mb-2">Studio siap dipakai</h3>
+        <p class="text-xs text-slate-400 max-w-sm leading-relaxed mb-8">Upload materi dan foto talent, pilih niche dan durasi, lalu AI akan meriset lokasi, menyusun storyboard, dan merender setiap scene.</p>
+        <div class="grid grid-cols-3 gap-3 w-full max-w-md text-left">
+          <div class="rounded-xl bg-slate-950/50 border border-slate-800 p-3"><i class="fa-solid fa-magnifying-glass text-cyan-400 text-sm"></i><p class="text-[11px] text-slate-300 mt-2 font-semibold">Riset</p><p class="text-[10px] text-slate-500">Data lokasi real-time</p></div>
+          <div class="rounded-xl bg-slate-950/50 border border-slate-800 p-3"><i class="fa-solid fa-film text-indigo-400 text-sm"></i><p class="text-[11px] text-slate-300 mt-2 font-semibold">Storyboard</p><p class="text-[10px] text-slate-500">Hook & flow otomatis</p></div>
+          <div class="rounded-xl bg-slate-950/50 border border-slate-800 p-3"><i class="fa-solid fa-image text-orange-400 text-sm"></i><p class="text-[11px] text-slate-300 mt-2 font-semibold">Render</p><p class="text-[10px] text-slate-500">Gambar per scene 9:16</p></div>
+        </div>
+      </div>
+
+      <!-- Pipeline -->
+      <div id="pipeline-state" class="hidden panel rounded-2xl p-8 fade-in">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 id="pipe-title" class="text-lg font-bold text-white">Memulai...</h2>
+            <p id="pipe-sub" class="text-xs text-slate-400 mt-1">Menyiapkan request</p>
+          </div>
+          <div id="pipe-pct" class="text-2xl font-black brand">0%</div>
+        </div>
+        <div class="w-full h-2 rounded-full bg-slate-800 overflow-hidden mb-8">
+          <div id="progress-bar" class="h-full rounded-full bg-gradient-to-r from-cyan-400 via-indigo-500 to-violet-500 transition-all duration-500" style="width:0%"></div>
+        </div>
+        <ol id="pipe-steps" class="grid grid-cols-1 sm:grid-cols-4 gap-3"></ol>
+      </div>
+
+      <!-- Result -->
+      <div id="result-state" class="hidden space-y-6">
+        <div class="panel rounded-2xl px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3 min-w-0">
+            <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 pulse-dot shrink-0"></span>
+            <span id="render-status" class="font-semibold text-sm text-white truncate">Production Ready</span>
+          </div>
+          <button id="btn-zip" onclick="downloadZip()" class="btn-primary text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 disabled:opacity-50">
+            <i class="fa-solid fa-file-zipper"></i> Download ZIP
+          </button>
+        </div>
+
+        <div id="research-card" class="hidden panel rounded-2xl p-5 border-l-4 border-l-cyan-400 fade-in"></div>
+
+        <div class="panel rounded-2xl overflow-hidden">
+          <div class="px-6 py-3.5 border-b border-slate-800/80 flex items-center gap-2">
+            <i class="fa-solid fa-book-open text-indigo-400 text-sm"></i>
+            <h3 class="font-bold text-xs uppercase tracking-wider text-indigo-300">Concept & Character</h3>
+          </div>
+          <div id="concept-card" class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2"><i class="fa-solid fa-film text-indigo-400"></i> Storyboard Scenes</h3>
+            <span id="scene-count" class="text-[11px] text-slate-500"></span>
+          </div>
+          <div id="scenes-container" class="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-5"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Lightbox -->
+<div id="lightbox" onclick="closeLightbox()" class="hidden fixed inset-0 z-[90] bg-black/85 backdrop-blur-sm items-center justify-center p-6 cursor-zoom-out">
+  <img id="lightbox-img" class="max-h-[90vh] max-w-full rounded-2xl shadow-2xl">
+</div>
+
+<div id="toast-container" class="fixed bottom-6 right-6 z-[95] flex flex-col gap-3"></div>
+
+<script>
+const API = '/api/gemini';
+const TEXT_MODEL = 'gemini-2.5-flash';
+const IMAGE_MODEL = 'gemini-2.5-flash-image-preview';
+const AUTH_KEY = 'vistara_auth';
+
+const state = {
+  mode: 'travel', materi: [], model: null, niche: 'hotel', style: 'luxury-traveller', duration: 10,
+  storyboard: null, research: null, sceneImages: {}, busy: false
+};
+const STYLES = {
+  travel: {'travel-vlog':'Travel Vlog Cinematic','viral-tiktok':'Viral TikTok Energetic','luxury-traveller':'Luxury Traveller','honest-review':'Honest Review Casual','budget-traveller':'Budget Informative'},
+  property: {'cinematic-property':'Cinematic Property Tour','virtual-walkthrough':'Virtual Show Unit POV','family-lifestyle':'Family Lifestyle Story','investor-pov':'Investor POV (ROI)'}
+};
+const NICHE_MAP = {hotel:'luxury-traveller',wisata:'travel-vlog',resto:'honest-review',destinasi:'budget-traveller',hiburan:'viral-tiktok',showunit:'cinematic-property',apartment:'investor-pov',perumahan:'family-lifestyle',ruko:'investor-pov'};
+const PROP_NICHES = ['showunit','apartment','perumahan','ruko'];
+const isProp = n => PROP_NICHES.includes(n);
+const PIPE_STEPS = [
+  { icon: 'fa-image', label: 'Analisis materi' },
+  { icon: 'fa-magnifying-glass', label: 'Riset lokasi' },
+  { icon: 'fa-file-lines', label: 'Susun storyboard' },
+  { icon: 'fa-camera', label: 'Render scene' }
+];
+
+// ================= UTIL =================
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const $ = id => document.getElementById(id);
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function showError(m) {
+  const b = $('error-box');
+  if (!m) { b.classList.add('hidden'); return; }
+  b.textContent = m; b.classList.remove('hidden');
+}
+function toast(m, type = 'info') {
+  const icon = type === 'error' ? 'fa-circle-exclamation text-rose-400' : type === 'ok' ? 'fa-circle-check text-emerald-400' : 'fa-circle-info text-indigo-400';
+  const t = document.createElement('div');
+  t.className = 'panel rounded-xl px-4 py-3 text-sm text-white flex items-center gap-3 fade-in min-w-[220px]';
+  t.innerHTML = `<i class="fa-solid ${icon}"></i><span>${esc(m)}</span>`;
+  $('toast-container').appendChild(t);
+  setTimeout(() => { t.style.transition = 'opacity .3s'; t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3000);
+}
+function setRenderStatus(text) { $('render-status').textContent = text; }
+
+// Panel: 'empty' | 'pipeline' | 'result'
+function showPanel(p) {
+  $('empty-state').classList.toggle('hidden', p !== 'empty');
+  $('pipeline-state').classList.toggle('hidden', p !== 'pipeline');
+  $('result-state').classList.toggle('hidden', p !== 'result');
+}
+
+// Pipeline: stepIdx 0..3, pct 0..100
+function setPipeline(stepIdx, pct, sub, title) {
+  $('progress-bar').style.width = pct + '%';
+  $('pipe-pct').textContent = Math.round(pct) + '%';
+  $('pipe-sub').textContent = sub || '';
+  if (title) $('pipe-title').textContent = title;
+  $('pipe-steps').innerHTML = PIPE_STEPS.map((s, i) => {
+    const done = i < stepIdx, active = i === stepIdx;
+    const cls = done ? 'border-emerald-500/30 bg-emerald-500/5'
+      : active ? 'border-indigo-500/50 bg-indigo-500/10'
+      : 'border-slate-800 bg-slate-950/40 opacity-60';
+    const badge = done ? '<i class="fa-solid
