@@ -185,19 +185,7 @@
         <div class="mb-6">
           <div class="label"><span class="step-no">4</span> Niche Konten</div>
           <select id="config-niche" onchange="handleNicheChange()" class="field cursor-pointer">
-            <optgroup label="Travel & Hospitality">
-              <option value="hotel">Review Hotel / Resort</option>
-              <option value="wisata">Review Tempat Wisata</option>
-              <option value="resto">Review Restoran / Cafe</option>
-              <option value="destinasi">Review Destinasi</option>
-              <option value="hiburan">Review Tempat Hiburan</option>
-            </optgroup>
-            <optgroup label="Property & Real Estate">
-              <option value="showunit">Show Unit Rumah / Cluster</option>
-              <option value="apartment">Apartment / Kondominium</option>
-              <option value="perumahan">Perumahan / Kavling Baru</option>
-              <option value="ruko">Ruko / Commercial Space</option>
-            </optgroup>
+            <!-- Options populated by JS -->
           </select>
         </div>
 
@@ -303,6 +291,8 @@
 <div id="toast-container" class="fixed bottom-6 right-6 z-[95] flex flex-col gap-3"></div>
 
 <script>
+// KONFIGURASI ACCESS CODE
+const ACCESS_CODE = 'vistara2025';
 const API = '/api/gemini';
 const TEXT_MODEL = 'gemini-2.5-flash';
 const IMAGE_MODEL = 'gemini-2.5-flash-image-preview';
@@ -345,14 +335,12 @@ function toast(m, type = 'info') {
 }
 function setRenderStatus(text) { $('render-status').textContent = text; }
 
-// Panel: 'empty' | 'pipeline' | 'result'
 function showPanel(p) {
   $('empty-state').classList.toggle('hidden', p !== 'empty');
   $('pipeline-state').classList.toggle('hidden', p !== 'pipeline');
   $('result-state').classList.toggle('hidden', p !== 'result');
 }
 
-// Pipeline: stepIdx 0..3, pct 0..100
 function setPipeline(stepIdx, pct, sub, title) {
   $('progress-bar').style.width = pct + '%';
   $('pipe-pct').textContent = Math.round(pct) + '%';
@@ -363,4 +351,445 @@ function setPipeline(stepIdx, pct, sub, title) {
     const cls = done ? 'border-emerald-500/30 bg-emerald-500/5'
       : active ? 'border-indigo-500/50 bg-indigo-500/10'
       : 'border-slate-800 bg-slate-950/40 opacity-60';
-    const badge = done ? '<i class="fa-solid
+    const badge = done ? '<i class="fa-solid fa-check text-emerald-400 text-xs"></i>' 
+      : active ? '<div class="loader !w-3 !h-3 !border-2"></div>' 
+      : `<i class="fa-solid ${s.icon} text-slate-500 text-xs"></i>`;
+    return `<li class="border rounded-xl p-3 flex items-center gap-3 ${cls}">
+      <div class="w-6 h-6 rounded-full flex items-center justify-center bg-slate-900 border border-slate-700 shrink-0">${badge}</div>
+      <span class="text-[11px] font-semibold ${done ? 'text-emerald-300' : active ? 'text-indigo-300' : 'text-slate-500'}">${s.label}</span>
+    </li>`;
+  }).join('');
+}
+
+// ================= AUTH =================
+function handleLogin(e) {
+  e.preventDefault();
+  const code = $('access-code').value.trim();
+  if (code !== ACCESS_CODE) {
+    const err = $('login-error');
+    err.textContent = 'Access code salah. Hubungi admin.';
+    err.classList.remove('hidden');
+    return;
+  }
+  localStorage.setItem(AUTH_KEY, code);
+  $('login-gate').style.display = 'none';
+  $('app').classList.remove('hidden');
+  initStudio();
+}
+
+function handleLogout() {
+  localStorage.removeItem(AUTH_KEY);
+  location.reload();
+}
+
+// ================= UPLOAD & COMPRESS =================
+function compressImg(file, max = 800) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        let { width, height } = img;
+        if (width > height && width > max) { height *= max / width; width = max; }
+        else if (height > max) { width *= max / height; height = max; }
+        c.width = width; c.height = height;
+        c.getContext('2d').drawImage(img, 0, 0, width, height);
+        const dataUrl = c.toDataURL('image/jpeg', 0.75);
+        res({ base64: dataUrl.split(',')[1], dataUrl });
+      };
+      img.onerror = rej;
+      img.src = e.target.result;
+    };
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+async function uploadMateri(files) {
+  if (!files) return;
+  const arr = Array.from(files).slice(0, 5 - state.materi.length);
+  for (const f of arr) state.materi.push(await compressImg(f));
+  renderMateri();
+}
+
+function renderMateri() {
+  const p = $('materi-placeholder'), pv = $('materi-grid'), cl = $('materi-clear'), cnt = $('materi-count');
+  cnt.textContent = `${state.materi.length}/5`;
+  if (!state.materi.length) { p.classList.remove('hidden'); pv.classList.add('hidden'); cl.classList.add('hidden'); return; }
+  p.classList.add('hidden'); pv.classList.remove('hidden'); cl.classList.remove('hidden');
+  pv.innerHTML = state.materi.map((m, i) =>
+    `<div class="relative aspect-square"><img src="${m.dataUrl}" class="w-full h-full object-cover rounded-lg border border-slate-700"><button onclick="state.materi.splice(${i},1);renderMateri()" class="absolute -top-1 -right-1 bg-rose-500 hover:bg-rose-400 text-white w-5 h-5 rounded-full text-[10px] shadow-lg flex items-center justify-center transition"><i class="fa-solid fa-xmark"></i></button></div>`
+  ).join('');
+}
+
+function clearMateri() { state.materi = []; renderMateri(); }
+
+async function uploadModel(file) {
+  if (!file) return;
+  state.model = await compressImg(file);
+  $('model-placeholder').classList.add('hidden');
+  const p = $('model-preview');
+  p.src = state.model.dataUrl; p.classList.remove('hidden');
+  $('model-clear').classList.remove('hidden');
+}
+
+function clearModel() {
+  state.model = null;
+  $('model-placeholder').classList.remove('hidden');
+  $('model-preview').classList.add('hidden');
+  $('model-clear').classList.add('hidden');
+}
+
+// ================= UI LOGIC =================
+function setMode(mode) {
+  state.mode = mode;
+  $('mode-travel').className = mode === 'travel' ? 'py-2 rounded-lg text-xs font-bold transition bg-indigo-600 text-white shadow-md' : 'py-2 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white';
+  $('mode-property').className = mode === 'property' ? 'py-2 rounded-lg text-xs font-bold transition bg-indigo-600 text-white shadow-md' : 'py-2 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white';
+  
+  const nicheSelect = $('config-niche');
+  if (mode === 'travel') {
+    nicheSelect.innerHTML = `
+      <optgroup label="Travel & Hospitality">
+        <option value="hotel">Review Hotel / Resort</option>
+        <option value="wisata">Review Tempat Wisata</option>
+        <option value="resto">Review Restoran / Cafe</option>
+        <option value="destinasi">Review Destinasi</option>
+        <option value="hiburan">Review Tempat Hiburan</option>
+      </optgroup>`;
+  } else {
+    nicheSelect.innerHTML = `
+      <optgroup label="Property & Real Estate">
+        <option value="showunit">Show Unit Rumah / Cluster</option>
+        <option value="apartment">Apartment / Kondominium</option>
+        <option value="perumahan">Perumahan / Kavling Baru</option>
+        <option value="ruko">Ruko / Commercial Space</option>
+      </optgroup>`;
+  }
+  handleNicheChange();
+}
+
+function handleNicheChange() {
+  state.niche = $('config-niche').value;
+  state.style = NICHE_MAP[state.niche];
+  const s = isProp(state.niche) ? STYLES.property : STYLES.travel;
+  const sel = $('config-style');
+  sel.innerHTML = Object.entries(s).map(([k, v]) =>
+    `<option value="${k}" ${k === state.style ? 'selected' : ''}>${v}</option>`
+  ).join('');
+  sel.onchange = () => { state.style = sel.value; };
+}
+
+function setDuration(d) {
+  state.duration = d;
+  [10, 20, 30].forEach(x => {
+    const b = $(`dur-${x}`);
+    b.className = x === d 
+      ? 'chip chip-on py-2.5 rounded-xl text-xs font-bold' 
+      : 'chip py-2.5 rounded-xl text-xs font-bold';
+  });
+}
+
+function resetStudio() {
+  state.materi = []; state.model = null; state.storyboard = null;
+  state.research = null; state.sceneImages = {};
+  $('location-name').value = '';
+  $('location-info').value = '';
+  setMode('travel');
+  setDuration(10); renderMateri(); clearModel();
+  showPanel('empty');
+  showError('');
+  toast('Studio direset');
+}
+
+function initStudio() {
+  setMode('travel');
+  setDuration(10);
+  showPanel('empty');
+}
+
+// ================= API CALLS =================
+async function callGemini(model, body) {
+  const r = await fetch(API, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, body })
+  });
+  if (!r.ok) throw new Error(`API ${r.status}: ${(await r.text()).slice(0, 150)}`);
+  return r.json();
+}
+
+function cleanJson(t) {
+  if (!t) return '{}';
+  const f = t.indexOf('{'), l = t.lastIndexOf('}');
+  return f === -1 || l === -1 ? '{}' : t.substring(f, l + 1);
+}
+
+async function startGeneration() {
+  if (!state.materi.length && !$('location-name').value.trim()) {
+    showError('Upload materi atau isi nama lokasi'); return;
+  }
+  showError('');
+  showPanel('pipeline');
+  $('btn-generate').disabled = true;
+  setPipeline(0, 5, 'Menyiapkan data...', 'Memulai Studio');
+
+  try {
+    const imgs = state.materi.map(m => m.base64);
+    const property = isProp(state.niche);
+    let name = $('location-name').value.trim();
+    const manual = $('location-info').value.trim();
+
+    // 1. Analyze
+    if (!name && imgs.length) {
+      setPipeline(0, 15, 'AI mengekstrak nama tempat dari gambar...', 'Analisis Materi');
+      try {
+        const prompt = property
+          ? `Analyze this property image. Return ONLY JSON: {"name":"Nama proyek/cluster (maks 5 kata)"}`
+          : `Analyze this location image. Return ONLY JSON: {"name":"Nama tempat (maks 5 kata)"}`;
+        const parts = [{ text: prompt }];
+        imgs.forEach(b => parts.push({ inlineData: { mimeType: 'image/jpeg', data: b } }));
+        const r = await callGemini(TEXT_MODEL, { contents: [{ parts }], generationConfig: { responseMimeType: 'application/json' }});
+        name = JSON.parse(cleanJson(r.candidates?.[0]?.content?.parts?.[0]?.text)).name || 'LOKASI_TIDAK_DIKETAHUI';
+      } catch { name = 'LOKASI_TIDAK_DIKETAHUI'; }
+    }
+
+    // 2. Research
+    setPipeline(1, 35, name ? `Mencari info tentang ${name}...` : 'Menggunakan info manual...', 'Riset Lokasi');
+    let ctx = manual ? `📌 INFO KLIEN:\n${manual}` : '';
+    if (name && name !== 'LOKASI_TIDAK_DIKETAHUI') {
+      try {
+        const p = property
+          ? `Riset singkat PROYEK PROPERTI: ${name}. 4 poin: 1) Harga & Promo 2) Spesifikasi Unit 3) Fasilitas 4) Akses Lokasi`
+          : `Riset singkat tempat: ${name}. 3 poin: 1) Daya Tarik 2) Fasilitas 3) Kesan Pengunjung`;
+        const r = await callGemini(TEXT_MODEL, { contents: [{ parts: [{ text: p }] }], tools: [{ google_search: {} }] });
+        const rs = r.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        ctx = manual ? `📌 INFO KLIEN:\n${manual}\n\nRISET WEB:\n${rs}` : rs;
+      } catch {}
+    }
+    state.research = { name: name || 'Custom Location', context: ctx };
+
+    // 3. Storyboard
+    setPipeline(2, 55, 'Menyusun alur cerita dan naskah...', 'Merancang Storyboard');
+    const sc = Math.floor(state.duration / 10) * 9 || 9;
+    const ids = Array.from({ length: sc }, (_, i) => i + 1).join(', ');
+    const styleLabel = (property ? STYLES.property : STYLES.travel)[state.style];
+
+    const sys = property
+      ? `Kamu Property Marketing Specialist & Video Director. Buat storyboard video MENJUAL PROPERTI.
+ATURAN PROPERTY:
+1. Flow: Fasad → Living Room → Kitchen → Bedroom → Bathroom → Fasilitas → Lokasi → Harga → CTA
+2. WAJIB sebut SPESIFIKASI (luas, kamar, material) & LOKASI (jarak tol, mall)
+3. Emotional selling: "Bayangkan anak bermain di halaman"
+4. DILARANG kata "hotel/resort/wisata" kecuali "dekat wisata"
+5. Fokus INVESTMENT: harga pre-launch, cicilan, SHM
+
+ATURAN UTAMA:
+- ${state.duration}s, TEPAT ${sc} SCENE, ID: [${ids}]
+- Karakter konsisten, hook kreatif, bahasa Indonesia natural
+- Style visual: ${styleLabel}`
+      : `Kamu Travel Content Creator & Video Director. Buat storyboard video travel menarik.
+ATURAN UTAMA:
+- ${state.duration}s, TEPAT ${sc} SCENE, ID: [${ids}]
+- Karakter konsisten, hook kreatif, bahasa Indonesia natural
+- Style visual: ${styleLabel}`;
+
+    const userP = `Buat storyboard:
+Niche: ${state.niche}
+Lokasi: ${name || 'auto'}
+Durasi: ${state.duration}s (TEPAT ${sc} SCENE)
+Riset: ${ctx || '(tidak ada)'}
+
+Return JSON:
+{ "concept": {"title":"","concept":"","audience":"","style":"","hook":"","cta":""}, "character": {"description":""}, "scenes": [{"id":1,"duration":"8s","desc":"","masterPrompt":""}] }`;
+
+    const parts = [{ text: userP }];
+    if (imgs.length) { parts.push({ text: 'Gambar referensi:' }); imgs.forEach(b => parts.push({ inlineData: { mimeType: 'image/jpeg', data: b } })); }
+    if (state.model) { parts.push({ text: 'Foto model:' }); parts.push({ inlineData: { mimeType: 'image/jpeg', data: state.model.base64 } }); }
+
+    const sbRes = await callGemini(TEXT_MODEL, {
+      systemInstruction: { parts: [{ text: sys }] },
+      contents: [{ parts }],
+      generationConfig: { responseMimeType: 'application/json' }
+    });
+    state.storyboard = JSON.parse(cleanJson(sbRes.candidates?.[0]?.content?.parts?.[0]?.text));
+    state.storyboard._isProp = property;
+
+    // 4. Images
+    showPanel('result');
+    const total = state.storyboard.scenes.length;
+    $('scene-count').textContent = `${total} Scenes`;
+    for (let i = 0; i < total; i++) {
+      const sc2 = state.storyboard.scenes[i];
+      setPipeline(3, 60 + Math.round((i / total) * 40), `Merender scene ${i+1} dari ${total}...`, 'Render Visual');
+      state.sceneImages[sc2.id] = { src: null, loading: true };
+      renderResult();
+      try {
+        const ip = property
+          ? `Photorealistic architectural & interior photography, real estate marketing, vertical 9:16, HDR. Scene: ${sc2.desc}. NO TEXT.`
+          : `Photorealistic cinematic travel photography, vertical 9:16. Scene: ${sc2.desc}. NO TEXT.`;
+        const iparts = [];
+        imgs.forEach(b => iparts.push({ inlineData: { mimeType: 'image/jpeg', data: b } }));
+        iparts.push({ text: ip });
+        const r = await callGemini(IMAGE_MODEL, { contents: [{ role: 'user', parts: iparts }], generationConfig: { responseModalities: ['IMAGE'] }});
+        const inl = r.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+        state.sceneImages[sc2.id] = { src: inl ? `data:${inl.inlineData.mimeType};base64,${inl.inlineData.data}` : null, loading: false };
+      } catch { state.sceneImages[sc2.id] = { src: null, loading: false }; }
+      renderResult();
+      if (i < total - 1) await sleep(1500);
+    }
+
+    setPipeline(3, 100, 'Selesai!', 'Production Ready');
+    setTimeout(() => showPanel('result'), 500);
+    $('btn-generate').disabled = false;
+    toast('Storyboard berhasil dibuat!', 'ok');
+  } catch (e) {
+    console.error(e);
+    showPanel('empty');
+    showError('Gagal: ' + e.message);
+    $('btn-generate').disabled = false;
+    toast('Terjadi kesalahan sistem', 'error');
+  }
+}
+
+// ================= RENDER =================
+function renderResult() {
+  const sb = state.storyboard;
+  if (!sb) return;
+  
+  if (state.research) {
+    const rc = $('research-card');
+    rc.classList.remove('hidden');
+    rc.innerHTML = `<div class="text-[10px] font-bold text-cyan-400 mb-1 uppercase tracking-wider">Verified Location Research</div><h4 class="text-sm font-bold text-white mb-2">${esc(state.research.name)}</h4><p class="text-xs text-slate-400 whitespace-pre-line leading-relaxed">${esc(state.research.context)}</p>`;
+  }
+  
+  $('concept-card').innerHTML = `
+    <div class="space-y-4">
+      <div><span class="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Judul Video</span><h4 class="text-base font-bold text-white mt-1">${esc(sb.concept?.title)}</h4><p class="text-xs text-slate-400 mt-1 leading-relaxed">${esc(sb.concept?.concept)}</p></div>
+      <div><span class="text-[10px] text-amber-500 uppercase font-bold tracking-wider">Hook (3s Pertama)</span><div class="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl text-xs text-amber-200 italic mt-1.5">"${esc(sb.concept?.hook)}"</div></div>
+    </div>
+    <div><span class="text-[10px] text-indigo-400 uppercase font-bold tracking-wider">Master Character</span><p class="text-xs text-slate-300 mt-1.5 bg-slate-900/80 p-3 rounded-xl font-mono leading-relaxed border border-slate-800">${esc(sb.character?.description)}</p></div>`;
+
+  $('scenes-container').innerHTML = sb.scenes.map(s => {
+    const img = state.sceneImages[s.id];
+    const ih = img?.loading 
+      ? `<div class="absolute inset-0 shimmer flex items-center justify-center"><div class="loader"></div></div>` 
+      : img?.src 
+        ? `<img src="${img.src}" onclick="openLightbox('${img.src}')" class="w-full h-full object-cover">` 
+        : `<div class="absolute inset-0 flex flex-col items-center justify-center text-slate-600 bg-slate-900"><i class="fa-solid fa-image-slash text-2xl mb-2"></i><span class="text-[10px] font-bold uppercase">No image</span></div>`;
+    
+    return `<div class="scene-card panel rounded-2xl p-4 flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-black text-xs w-7 h-7 flex items-center justify-center rounded-lg">${s.id}</span>
+          <span class="font-bold text-xs text-white uppercase tracking-wider">Scene ${s.id}</span>
+        </div>
+        <span class="text-[10px] font-bold text-slate-400 bg-slate-900 px-2 py-1 rounded-md border border-slate-800">${esc(s.duration||'8s')}</span>
+      </div>
+      
+      <div class="flex gap-4">
+        <div class="w-1/3 shrink-0 flex flex-col gap-2">
+          <div class="thumb border border-slate-800">${ih}</div>
+          <button onclick="regenScene(${s.id})" class="btn-ghost py-1.5 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5"><i class="fa-solid fa-rotate-right"></i> Retake</button>
+        </div>
+        
+        <div class="flex-1 flex flex-col gap-3 min-w-0">
+          <div>
+            <span class="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Action</span>
+            <p class="text-[11px] text-slate-300 mt-1 line-clamp-3 leading-relaxed">${esc(s.desc)}</p>
+          </div>
+          <div class="flex-1 flex flex-col">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Master Prompt</span>
+              <button onclick="copyP(${s.id})" class="text-[10px] text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1"><i class="fa-solid fa-copy"></i> Copy</button>
+            </div>
+            <div class="bg-slate-950 border border-slate-800 p-2.5 rounded-lg flex-1 overflow-y-auto max-h-[100px] custom-scrollbar">
+              <p class="text-[10px] text-slate-400 font-mono leading-relaxed">${esc(s.masterPrompt)}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function regenScene(id) {
+  const s = state.storyboard.scenes.find(x => x.id === id);
+  if (!s) return;
+  state.sceneImages[id] = { src: null, loading: true };
+  renderResult();
+  try {
+    const ip = state.storyboard._isProp
+      ? `Photorealistic architectural & interior photography, real estate marketing, vertical 9:16, HDR. Scene: ${s.desc}. NO TEXT.`
+      : `Photorealistic cinematic travel photography, vertical 9:16. Scene: ${s.desc}. NO TEXT.`;
+    const parts = [];
+    state.materi.forEach(m => parts.push({ inlineData: { mimeType: 'image/jpeg', data: m.base64 } }));
+    parts.push({ text: ip });
+    const r = await callGemini(IMAGE_MODEL, { contents: [{ role: 'user', parts }], generationConfig: { responseModalities: ['IMAGE'] }});
+    const inl = r.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+    state.sceneImages[id] = { src: inl ? `data:${inl.inlineData.mimeType};base64,${inl.inlineData.data}` : null, loading: false };
+  } catch { state.sceneImages[id] = { src: null, loading: false }; }
+  renderResult();
+}
+
+async function downloadZip() {
+  const sb = state.storyboard;
+  if (!sb) return;
+  
+  const btn = $('btn-zip');
+  const origHtml = btn.innerHTML;
+  btn.innerHTML = '<i class="fa-solid fa-circle-notch animate-spin"></i> Zipping...';
+  btn.disabled = true;
+
+  try {
+    const zip = new JSZip();
+    let txt = `=== VISTARA STUDIO ===\nJudul: ${sb.concept?.title || '-'}\nLokasi: ${state.research?.name || '-'}\nStyle: ${sb.concept?.style || '-'}\nHook: ${sb.concept?.hook || '-'}\n\n`;
+    if (state.research?.context) txt += `RISET:\n${state.research.context}\n\n`;
+    txt += `KARAKTER: ${sb.character?.description || '-'}\n\n`;
+    
+    sb.scenes.forEach(s => {
+      txt += `\n--- SCENE ${s.id} (${s.duration}) ---\nACTION: ${s.desc}\nPROMPT: ${s.masterPrompt}\n`;
+      const img = state.sceneImages[s.id]?.src;
+      if (img?.startsWith('data:')) zip.file(`Scene_${s.id}.png`, img.split(',')[1], { base64: true });
+    });
+    
+    zip.file('Storyboard.txt', txt);
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `Vistara_Project_${Date.now()}.zip`;
+    a.click();
+    toast('File ZIP berhasil diunduh', 'ok');
+  } catch (e) {
+    toast('Gagal membuat ZIP', 'error');
+  } finally {
+    btn.innerHTML = origHtml;
+    btn.disabled = false;
+  }
+}
+
+function copyP(id) {
+  const s = state.storyboard.scenes.find(x => x.id === id);
+  if (s) { navigator.clipboard.writeText(s.masterPrompt); toast('Prompt disalin ke clipboard', 'ok'); }
+}
+
+// ================= MISC =================
+function openLightbox(src) {
+  $('lightbox-img').src = src;
+  $('lightbox').classList.remove('hidden');
+  $('lightbox').classList.add('flex');
+}
+function closeLightbox() {
+  $('lightbox').classList.add('hidden');
+  $('lightbox').classList.remove('flex');
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  if (localStorage.getItem(AUTH_KEY) === ACCESS_CODE) {
+    $('login-gate').style.display = 'none';
+    $('app').classList.remove('hidden');
+    initStudio();
+  }
+});
+</script>
+</body>
+</html>
