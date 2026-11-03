@@ -294,8 +294,7 @@
 // KONFIGURASI ACCESS CODE
 const ACCESS_CODE = 'vistara2025';
 const API = '/api/gemini';
-const TEXT_MODEL = 'gemini-3-flash-preview';
-const IMAGE_MODEL = 'gemini-3.1-flash-image-preview';
+const TEXT_MODEL = 'gemini-2.0-flash';
 const AUTH_KEY = 'vistara_auth';
 
 const state = {
@@ -333,7 +332,6 @@ function toast(m, type = 'info') {
   $('toast-container').appendChild(t);
   setTimeout(() => { t.style.transition = 'opacity .3s'; t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3000);
 }
-function setRenderStatus(text) { $('render-status').textContent = text; }
 
 function showPanel(p) {
   $('empty-state').classList.toggle('hidden', p !== 'empty');
@@ -623,17 +621,24 @@ Return JSON:
       setPipeline(3, 60 + Math.round((i / total) * 40), `Merender scene ${i+1} dari ${total}...`, 'Render Visual');
       state.sceneImages[sc2.id] = { src: null, loading: true };
       renderResult();
+      
       try {
+        // --- MENGGUNAKAN POLLINATIONS AI (GRATIS & TANPA BATAS) ---
         const ip = property
           ? `Photorealistic architectural & interior photography, real estate marketing, vertical 9:16, HDR. Scene: ${sc2.desc}. NO TEXT.`
           : `Photorealistic cinematic travel photography, vertical 9:16. Scene: ${sc2.desc}. NO TEXT.`;
-        const iparts = [];
-        imgs.forEach(b => iparts.push({ inlineData: { mimeType: 'image/jpeg', data: b } }));
-        iparts.push({ text: ip });
-        const r = await callGemini(IMAGE_MODEL, { contents: [{ role: 'user', parts: iparts }], generationConfig: { responseModalities: ['IMAGE'] }});
-        const inl = r.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-        state.sceneImages[sc2.id] = { src: inl ? `data:${inl.inlineData.mimeType};base64,${inl.inlineData.data}` : null, loading: false };
+        
+        const encodedPrompt = encodeURIComponent(ip);
+        const imgUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=540&height=960&nologo=true&seed=${Math.floor(Math.random() * 100000)}`;
+
+        await new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => { state.sceneImages[sc2.id] = { src: imgUrl, loading: false }; resolve(); };
+            img.onerror = () => { state.sceneImages[sc2.id] = { src: null, loading: false }; resolve(); };
+            img.src = imgUrl;
+        });
       } catch { state.sceneImages[sc2.id] = { src: null, loading: false }; }
+      
       renderResult();
       if (i < total - 1) await sleep(1500);
     }
@@ -717,16 +722,21 @@ async function regenScene(id) {
   if (!s) return;
   state.sceneImages[id] = { src: null, loading: true };
   renderResult();
+  
   try {
     const ip = state.storyboard._isProp
       ? `Photorealistic architectural & interior photography, real estate marketing, vertical 9:16, HDR. Scene: ${s.desc}. NO TEXT.`
       : `Photorealistic cinematic travel photography, vertical 9:16. Scene: ${s.desc}. NO TEXT.`;
-    const parts = [];
-    state.materi.forEach(m => parts.push({ inlineData: { mimeType: 'image/jpeg', data: m.base64 } }));
-    parts.push({ text: ip });
-    const r = await callGemini(IMAGE_MODEL, { contents: [{ role: 'user', parts }], generationConfig: { responseModalities: ['IMAGE'] }});
-    const inl = r.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-    state.sceneImages[id] = { src: inl ? `data:${inl.inlineData.mimeType};base64,${inl.inlineData.data}` : null, loading: false };
+    
+    const encodedPrompt = encodeURIComponent(ip);
+    const imgUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=540&height=960&nologo=true&seed=${Math.floor(Math.random() * 100000)}`;
+    
+    await new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => { state.sceneImages[id] = { src: imgUrl, loading: false }; resolve(); };
+        img.onerror = () => { state.sceneImages[id] = { src: null, loading: false }; resolve(); };
+        img.src = imgUrl;
+    });
   } catch { state.sceneImages[id] = { src: null, loading: false }; }
   renderResult();
 }
@@ -746,11 +756,20 @@ async function downloadZip() {
     if (state.research?.context) txt += `RISET:\n${state.research.context}\n\n`;
     txt += `KARAKTER: ${sb.character?.description || '-'}\n\n`;
     
-    sb.scenes.forEach(s => {
+    for (const s of sb.scenes) {
       txt += `\n--- SCENE ${s.id} (${s.duration}) ---\nACTION: ${s.desc}\nPROMPT: ${s.masterPrompt}\n`;
-      const img = state.sceneImages[s.id]?.src;
-      if (img?.startsWith('data:')) zip.file(`Scene_${s.id}.png`, img.split(',')[1], { base64: true });
-    });
+      const imgUrl = state.sceneImages[s.id]?.src;
+      if (imgUrl) {
+        try {
+          // Fetch gambar dari URL (Pollinations) untuk dimasukkan ke ZIP
+          const response = await fetch(imgUrl);
+          const blob = await response.blob();
+          zip.file(`Scene_${s.id}.jpg`, blob);
+        } catch (e) {
+          console.error("Gagal memasukkan gambar ke zip", e);
+        }
+      }
+    }
     
     zip.file('Storyboard.txt', txt);
     const blob = await zip.generateAsync({ type: 'blob' });
